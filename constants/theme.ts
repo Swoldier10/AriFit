@@ -1,53 +1,102 @@
-/**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
- */
-
-import { Platform } from 'react-native';
-
-const tintColorLight = '#0a7ea4';
-const tintColorDark = '#fff';
-
-export const Colors = {
-  light: {
-    text: '#11181C',
-    background: '#fff',
-    tint: tintColorLight,
-    icon: '#687076',
-    tabIconDefault: '#687076',
-    tabIconSelected: tintColorLight,
+export const theme = {
+  colors: {
+    primary: '#4F46E5',       // indigo
+    primaryLight: '#818CF8',
+    secondary: '#10B981',     // emerald
+    secondaryLight: '#6EE7B7',
+    background: '#F9FAFB',
+    surface: '#FFFFFF',
+    text: '#111827',
+    textSecondary: '#6B7280',
+    border: '#E5E7EB',
+    error: '#EF4444',
+    success: '#22C55E',
+    white: '#FFFFFF',
   },
   dark: {
-    text: '#ECEDEE',
-    background: '#151718',
-    tint: tintColorDark,
-    icon: '#9BA1A6',
-    tabIconDefault: '#9BA1A6',
-    tabIconSelected: tintColorDark,
+    colors: {
+      background: '#0B1120',
+      surface: 'rgba(255,255,255,0.08)',
+      surfaceBorder: 'rgba(255,255,255,0.15)',
+      accent: '#00D4FF',
+      accentLight: '#66E5FF',
+      text: '#FFFFFF',
+      textSecondary: 'rgba(255,255,255,0.60)',
+      textMuted: 'rgba(255,255,255,0.35)',
+      inputBackground: 'rgba(255,255,255,0.06)',
+      inputBorder: 'rgba(255,255,255,0.12)',
+      // Liquid glass tokens
+      glassBorderStart: 'rgba(255,255,255,0.28)',
+      glassBorderEnd: 'rgba(255,255,255,0.08)',
+      glassSurface: 'rgba(255,255,255,0.04)',
+      glassSurfaceAndroid: 'rgba(14,22,42,0.72)',
+      glassHighlight: 'rgba(255,255,255,0.18)',
+      glassBorderStartStrong: 'rgba(255,255,255,0.22)',
+      glassInnerGlow: 'rgba(255,255,255,0.03)',
+      glassShadow: 'rgba(0,0,0,0.45)',
+      inputBackgroundGlass: 'rgba(255,255,255,0.08)',
+      inputBorderGlass: 'rgba(255,255,255,0.18)',
+      overlayDark: 'rgba(11,17,32,0.55)',
+      glassButtonBg: 'rgba(0,212,255,0.10)',
+      glassButtonBorder: 'rgba(0,212,255,0.30)',
+      error: '#FF6B6B',
+      // Floating tab bar
+      tabBarBg: 'rgba(22,33,55,0.55)',
+      tabBarBgAndroid: 'rgba(14,22,42,0.88)',
+      tabBarBorder: 'rgba(255,255,255,0.18)',
+      tabBarShadow: 'rgba(0,0,0,0.50)',
+      statCardIcon: 'rgba(0,212,255,0.15)',
+      badgeBg: 'rgba(0,212,255,0.20)',
+      badgeText: '#00D4FF',
+      successGreen: '#22C55E',
+      successGreenBg: 'rgba(34,197,94,0.12)',
+      // Liquid glass circle buttons
+      glassCircleBg: 'rgba(255,255,255,0.08)',
+      glassCircleBorder: 'rgba(255,255,255,0.20)',
+      // Accent opacity variants
+      accentBg: 'rgba(0,212,255,0.12)',
+      accentBorder: 'rgba(0,212,255,0.25)',
+      // White overlays
+      whiteOverlay4: 'rgba(255,255,255,0.04)',
+      whiteOverlay5: 'rgba(255,255,255,0.05)',
+      whiteOverlay6: 'rgba(255,255,255,0.06)',
+      whiteOverlay10: 'rgba(255,255,255,0.10)',
+      // Background overlay gradient stops
+      overlayLight: 'rgba(11,17,32,0.65)',
+      overlayMid: 'rgba(11,17,32,0.80)',
+      overlayHeavy: 'rgba(11,17,32,0.92)',
+      // Error/success button variants
+      errorBg: 'rgba(255,107,107,0.10)',
+      errorBorder: 'rgba(255,107,107,0.25)',
+      successBorder: 'rgba(34,197,94,0.30)',
+      // Overlays
+      imageOverlay: 'rgba(0,0,0,0.40)',
+      modalBackdrop: 'rgba(0,0,0,0.50)',
+    },
   },
-};
-
-export const Fonts = Platform.select({
-  ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
-    sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
-    serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
-    rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
-    mono: 'ui-monospace',
+  fontSize: {
+    xs: 12,
+    sm: 14,
+    md: 16,
+    lg: 18,
+    xl: 24,
+    xxl: 32,
+    xxxl: 36,
   },
-  default: {
-    sans: 'normal',
-    serif: 'serif',
-    rounded: 'normal',
-    mono: 'monospace',
+  spacing: {
+    xs: 4,
+    sm: 8,
+    md: 16,
+    lg: 24,
+    xl: 32,
+    xxl: 48,
   },
-  web: {
-    sans: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-    serif: "Georgia, 'Times New Roman', serif",
-    rounded: "'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif",
-    mono: "SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
+  borderRadius: {
+    sm: 4,
+    md: 8,
+    lg: 12,
+    xl: 16,
+    xxl: 28,
+    full: 9999,
   },
-});
+} as const;

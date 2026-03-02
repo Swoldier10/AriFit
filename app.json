@@ -9,7 +9,8 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.AriFit"
     },
     "android": {
       "adaptiveIcon": {
@@ -35,10 +36,11 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
           "dark": {
-            "backgroundColor": "#000000"
+            "backgroundColor": "#0B1120"
           }
         }
-      ]
+      ],
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true,
