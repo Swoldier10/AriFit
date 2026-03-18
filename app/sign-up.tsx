@@ -26,7 +26,7 @@ export default function SignUp() {
   const params = useLocalSearchParams<{ userType?: string }>();
 
   const userType: UserType =
-    params.userType === 'trainer' ? 'trainer' : 'client';
+    params.userType === 'client' ? 'client' : 'trainer';
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -55,9 +55,6 @@ export default function SignUp() {
     }
   };
 
-  const subtitle =
-    userType === 'trainer' ? 'Create your trainer account' : 'Join the community';
-
   return (
     <AuthBackground>
       <KeyboardAvoidingView
@@ -68,11 +65,6 @@ export default function SignUp() {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Back button */}
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <Text style={styles.backText}>{'‹ Back'}</Text>
-          </TouchableOpacity>
-
           <Image
             source={require('@/assets/images/AriFit-Logo.png')}
             style={styles.logo}
@@ -80,8 +72,8 @@ export default function SignUp() {
           />
 
           <GlassCard style={styles.card}>
-            <Text style={styles.title}>Create Account</Text>
-            <Text style={styles.subtitle}>{subtitle}</Text>
+            <Text style={styles.title}>Become a Trainer</Text>
+            <Text style={styles.subtitle}>Create your account</Text>
 
             <GlassInput
               icon="person-outline"
@@ -156,15 +148,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.lg,
     paddingTop: 60,
     paddingBottom: theme.spacing.xl,
-  },
-  backButton: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-  },
-  backText: {
-    fontSize: theme.fontSize.lg,
-    color: dark.textSecondary,
   },
   logo: {
     width: 160,

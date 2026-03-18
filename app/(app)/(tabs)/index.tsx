@@ -11,7 +11,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 import ScreenBackground from '@/components/ui/ScreenBackground';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -19,20 +18,9 @@ import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
 import { theme } from '@/constants/theme';
 import StatCard from '@/components/trainer/StatCard';
-import TeamCard, { type TeamData } from '@/components/trainer/TeamCard';
 import GlassCard from '@/components/ui/GlassCard';
 
 const dark = theme.dark.colors;
-
-/** Raw row shape returned by Supabase for teams with aggregate count */
-interface RawTeamRow {
-  id: string;
-  name: string;
-  category: string;
-  description: string | null;
-  image_url: string | null;
-  team_members: { count: number }[];
-}
 
 /** Raw row shape for team_members join query (client dashboard) */
 interface RawTeamMemberRow {
@@ -161,7 +149,6 @@ function TrainerDashboard() {
   const router = useRouter();
   const userId = session?.user?.id;
 
-  const [teams, setTeams] = useState<TeamData[]>([]);
   const [teamCount, setTeamCount] = useState(0);
   const [clientCount, setClientCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -169,13 +156,7 @@ function TrainerDashboard() {
   const fetchDashboardData = useCallback(async () => {
     if (!userId) return;
 
-    const [teamsRes, teamCountRes, clientsRes] = await Promise.all([
-      supabase
-        .from('teams')
-        .select('id, name, category, description, image_url, team_members(count)')
-        .eq('created_by', userId)
-        .order('created_at', { ascending: false })
-        .limit(3),
+    const [teamCountRes, clientsRes] = await Promise.all([
       supabase
         .from('teams')
         .select('id', { count: 'exact', head: true })
@@ -188,17 +169,6 @@ function TrainerDashboard() {
         .neq('role', 'owner'),
     ]);
 
-    if (teamsRes.data) {
-      const mapped: TeamData[] = (teamsRes.data as RawTeamRow[]).map((t) => ({
-        id: t.id,
-        name: t.name,
-        category: t.category,
-        description: t.description,
-        image_url: t.image_url,
-        member_count: t.team_members?.[0]?.count ?? 0,
-      }));
-      setTeams(mapped);
-    }
     setTeamCount(teamCountRes.count ?? 0);
     if (clientsRes.count !== null) {
       setClientCount(clientsRes.count);
@@ -267,47 +237,6 @@ function TrainerDashboard() {
           </View>
         )}
 
-        {/* ── Create New Team ── */}
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => router.push('/create-team')}
-          style={styles.createWrap}
-        >
-          <LinearGradient
-            colors={['rgba(0,212,255,0.25)', 'rgba(0,212,255,0.10)']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.createGradient}
-          >
-            <Ionicons name="add-circle" size={24} color={dark.accent} />
-            <Text style={styles.createText}>Create New Team</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-
-        {/* ── Current Teams ── */}
-        {!loading && (
-          <>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Current Teams</Text>
-              <TouchableOpacity onPress={() => router.push('/(app)/(tabs)/teams')}>
-                <Text style={styles.viewAll}>View All</Text>
-              </TouchableOpacity>
-            </View>
-            {teams.length > 0 ? (
-              teams.map((team) => (
-                <TeamCard key={team.id} team={team} onPress={() => router.push(`/edit-team?id=${team.id}`)} />
-              ))
-            ) : (
-              <View style={styles.emptyTeams}>
-                <Ionicons name="people-outline" size={32} color={dark.textMuted} />
-                <Text style={styles.emptyTeamsText}>No teams yet</Text>
-                <Text style={styles.emptyTeamsHint}>
-                  Create your first team to get started
-                </Text>
-              </View>
-            )}
-          </>
-        )}
       </ScrollView>
       </SafeAreaView>
     </ScreenBackground>
@@ -653,35 +582,6 @@ const styles = StyleSheet.create({
   loader: {
     marginVertical: theme.spacing.xl,
   },
-  /* Create button (trainer) */
-  createWrap: {
-    borderRadius: 22,
-    borderWidth: 1.5,
-    borderColor: 'rgba(0,212,255,0.45)',
-    overflow: 'hidden',
-    marginBottom: theme.spacing.lg,
-    ...(Platform.OS === 'ios'
-      ? {
-          shadowColor: 'rgba(0,212,255,0.55)',
-          shadowOffset: { width: 0, height: 6 },
-          shadowOpacity: 0.6,
-          shadowRadius: 20,
-        }
-      : { elevation: 12 }),
-  },
-  createGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    gap: theme.spacing.sm + 2,
-  },
-  createText: {
-    fontSize: theme.fontSize.md,
-    fontWeight: '700',
-    color: dark.accent,
-    letterSpacing: 0.3,
-  },
   /* Section */
   sectionHeader: {
     flexDirection: 'row',
@@ -693,11 +593,6 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.lg,
     fontWeight: '700',
     color: dark.text,
-  },
-  viewAll: {
-    fontSize: theme.fontSize.sm,
-    color: dark.accent,
-    fontWeight: '600',
   },
   emptyTeams: {
     alignItems: 'center',

@@ -7,6 +7,8 @@ import { theme } from '@/constants/theme';
 
 const dark = theme.dark.colors;
 
+const DAY_NAMES_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
 export interface TeamData {
   id: string;
   name: string;
@@ -15,6 +17,7 @@ export interface TeamData {
   image_url: string | null;
   member_count: number;
   created_at?: string;
+  schedules?: { day_of_week: number; start_time: string }[];
 }
 
 interface TeamCardProps {
@@ -57,6 +60,19 @@ export default function TeamCard({ team, onPress }: TeamCardProps) {
               {team.member_count} Member{team.member_count !== 1 ? 's' : ''}
               {' \u00B7 Active'}
             </Text>
+            {team.schedules && team.schedules.length > 0 && (() => {
+              const sorted = [...team.schedules].sort((a, b) => a.day_of_week - b.day_of_week || a.start_time.localeCompare(b.start_time));
+              const days = sorted.map((s) => DAY_NAMES_SHORT[s.day_of_week]);
+              const firstTime = sorted[0].start_time.slice(0, 5);
+              return (
+                <View style={styles.scheduleRow}>
+                  <Ionicons name="calendar-outline" size={14} color={dark.textMuted} />
+                  <Text style={styles.scheduleText}>
+                    {days.join(', ')} {'\u00B7'} {firstTime}
+                  </Text>
+                </View>
+              );
+            })()}
           </View>
 
           {/* Circular chevron button */}
@@ -131,6 +147,16 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   memberText: {
+    fontSize: theme.fontSize.sm,
+    color: dark.textSecondary,
+  },
+  scheduleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
+  scheduleText: {
     fontSize: theme.fontSize.sm,
     color: dark.textSecondary,
   },

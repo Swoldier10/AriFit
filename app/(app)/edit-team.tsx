@@ -7,10 +7,11 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  LayoutAnimation,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
-import * as Clipboard from 'expo-clipboard';
+
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/lib/auth-context';
@@ -32,7 +33,15 @@ const extractStoragePath = (url: string): string | null => {
   return url.slice(idx + marker.length).split('?')[0];
 };
 
-type Tab = 'settings' | 'members' | 'requests';
+const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+interface ScheduleEntry {
+  id?: string;
+  day_of_week: number;
+  start_time: string;
+}
+
+type Tab = 'settings' | 'members';
 
 interface MemberRow {
   id: string;
@@ -61,8 +70,13 @@ export default function EditTeamScreen() {
   const [category, setCategory] = useState<string>('general');
   const [existingImageUrl, setExistingImageUrl] = useState<string | null>(null);
   const [newImageUri, setNewImageUri] = useState<string | null>(null);
-  const [uniqueCode, setUniqueCode] = useState<string | null>(null);
-  const [linkCopied, setLinkCopied] = useState(false);
+
+  /* Schedule state */
+  const [schedules, setSchedules] = useState<ScheduleEntry[]>([]);
+  const [addingSession, setAddingSession] = useState(false);
+  const [newDay, setNewDay] = useState(0);
+  const [newHour, setNewHour] = useState('08');
+  const [newMinute, setNewMinute] = useState('00');
 
   /* Members state */
   const [members, setMembers] = useState<MemberRow[]>([]);
@@ -75,7 +89,7 @@ export default function EditTeamScreen() {
     (async () => {
       const { data, error } = await supabase
         .from('teams')
-        .select('name, description, category, image_url, unique_code')
+        .select('name, description, category, image_url')
         .eq('id', teamId)
         .single();
 
@@ -89,7 +103,15 @@ export default function EditTeamScreen() {
       setDescription(data.description ?? '');
       setCategory(data.category);
       setExistingImageUrl(data.image_url);
-      setUniqueCode(data.unique_code);
+
+      const { data: schedData } = await supabase
+        .from('team_schedules')
+        .select('id, day_of_week, start_time')
+        .eq('team_id', teamId)
+        .order('day_of_week')
+        .order('start_time');
+      if (schedData) setSchedules(schedData);
+
       setLoading(false);
     })();
   }, [teamId]);
@@ -159,8 +181,22 @@ export default function EditTeamScreen() {
       if (url) updates.image_url = url;
     }
     const { error } = await supabase.from('teams').update(updates).eq('id', teamId);
+    if (error) { setSaving(false); Alert.alert('Error', error.message); return; }
+
+    // Save schedules: delete all then re-insert
+    await supabase.from('team_schedules').delete().eq('team_id', teamId);
+    if (schedules.length > 0) {
+      const { error: schedError } = await supabase.from('team_schedules').insert(
+        schedules.map((s) => ({
+          team_id: teamId,
+          day_of_week: s.day_of_week,
+          start_time: s.start_time,
+        }))
+      );
+      if (schedError) { setSaving(false); Alert.alert('Error', schedError.message); return; }
+    }
+
     setSaving(false);
-    if (error) { Alert.alert('Error', error.message); return; }
     router.back();
   };
 
@@ -191,14 +227,6 @@ export default function EditTeamScreen() {
     ]);
   };
 
-  /* ─── Copy invite link ─── */
-  const handleCopyInvite = async () => {
-    const link = `arifit://join/${uniqueCode ?? teamId}`;
-    await Clipboard.setStringAsync(link);
-    setLinkCopied(true);
-    setTimeout(() => setLinkCopied(false), 2000);
-  };
-
   /* ─── Accept / decline request ─── */
   const handleRequest = async (memberId: string, action: 'active' | 'declined') => {
     const { error } = await supabase
@@ -207,6 +235,28 @@ export default function EditTeamScreen() {
       .eq('id', memberId);
 
     if (error) { Alert.alert('Error', error.message); return; }
+
+    // Auto-add to trainer_clients when accepting
+    if (action === 'active' && session?.user?.id) {
+      const member = requests.find((r) => r.id === memberId);
+      if (member) {
+        const { data: existing } = await supabase
+          .from('trainer_clients')
+          .select('id')
+          .eq('trainer_id', session.user.id)
+          .eq('client_id', member.user_id)
+          .maybeSingle();
+
+        if (!existing) {
+          await supabase.from('trainer_clients').insert({
+            trainer_id: session.user.id,
+            client_id: member.user_id,
+            status: 'active',
+          });
+        }
+      }
+    }
+
     fetchMembers();
   };
 
@@ -239,8 +289,7 @@ export default function EditTeamScreen() {
   /* ═══════════════════════════════ TABS ═══════════════════════════════ */
 
   const TABS: { key: Tab; label: string; icon: keyof typeof Ionicons.glyphMap; badge?: number }[] = [
-    { key: 'members', label: 'Members', icon: 'people-outline', badge: members.length },
-    { key: 'requests', label: 'Requests', icon: 'person-add-outline', badge: requests.length },
+    { key: 'members', label: 'Members', icon: 'people-outline', badge: members.length + requests.length },
     { key: 'settings', label: 'Settings', icon: 'settings-outline' },
   ];
 
@@ -276,7 +325,7 @@ export default function EditTeamScreen() {
                   {tab.label}
                 </Text>
                 {(tab.badge ?? 0) > 0 && (
-                  <View style={[styles.badge, tab.key === 'requests' && requests.length > 0 && styles.badgeAlert]}>
+                  <View style={[styles.badge, tab.key === 'members' && requests.length > 0 && styles.badgeAlert]}>
                     <Text style={styles.badgeText}>{tab.badge}</Text>
                   </View>
                 )}
@@ -299,40 +348,94 @@ export default function EditTeamScreen() {
               description={description} setDescription={setDescription}
               category={category} setCategory={setCategory}
               displayImage={displayImage} pickImage={pickImage}
-              uniqueCode={uniqueCode} teamId={teamId}
-              linkCopied={linkCopied} handleCopyInvite={handleCopyInvite}
               saving={saving} handleSave={handleSave}
               deleting={deleting} handleDelete={handleDelete}
+              schedules={schedules} setSchedules={setSchedules}
+              addingSession={addingSession} setAddingSession={setAddingSession}
+              newDay={newDay} setNewDay={setNewDay}
+              newHour={newHour} setNewHour={setNewHour}
+              newMinute={newMinute} setNewMinute={setNewMinute}
             />
           )}
           {activeTab === 'members' && (
-            <MembersTab
-              members={members}
-              loading={membersLoading}
-              onRemove={handleRemoveMember}
-            />
-          )}
-          {activeTab === 'requests' && (
-            <RequestsTab
-              requests={requests}
-              loading={membersLoading}
-              onAccept={(id) => handleRequest(id, 'active')}
-              onDecline={(id) => {
-                const req = requests.find((r) => r.id === id);
-                Alert.alert(
-                  'Decline Request',
-                  `Decline ${req?.profiles?.full_name ?? 'this request'}?`,
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Decline', style: 'destructive', onPress: () => handleRequest(id, 'declined') },
-                  ],
-                );
-              }}
-            />
+            membersLoading ? (
+              <ActivityIndicator color={dark.accent} style={{ marginTop: 40 }} />
+            ) : (
+              <>
+                {requests.length > 0 && (
+                  <CollapsibleSection title="Requests" icon="person-add-outline" count={requests.length}>
+                    <RequestsTab
+                      requests={requests}
+                      loading={false}
+                      onAccept={(id) => handleRequest(id, 'active')}
+                      onDecline={(id) => {
+                        const req = requests.find((r) => r.id === id);
+                        Alert.alert(
+                          'Decline Request',
+                          `Decline ${req?.profiles?.full_name ?? 'this request'}?`,
+                          [
+                            { text: 'Cancel', style: 'cancel' },
+                            { text: 'Decline', style: 'destructive', onPress: () => handleRequest(id, 'declined') },
+                          ],
+                        );
+                      }}
+                    />
+                  </CollapsibleSection>
+                )}
+                <CollapsibleSection title="Members" icon="people-outline" count={members.length}>
+                  <MembersTab
+                    members={members}
+                    loading={false}
+                    onRemove={handleRemoveMember}
+                  />
+                </CollapsibleSection>
+              </>
+            )
           )}
         </ScrollView>
       </SafeAreaView>
     </ScreenBackground>
+  );
+}
+
+/* ═════════════════════ COLLAPSIBLE SECTION ═════════════════════ */
+
+function CollapsibleSection({
+  title,
+  icon,
+  count,
+  children,
+  defaultExpanded = false,
+}: {
+  title: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  count: number;
+  children: React.ReactNode;
+  defaultExpanded?: boolean;
+}) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
+
+  const toggle = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpanded((prev) => !prev);
+  };
+
+  return (
+    <View style={styles.collapsibleWrapper}>
+      <TouchableOpacity style={styles.collapsibleHeader} activeOpacity={0.7} onPress={toggle}>
+        <Ionicons name={icon} size={18} color={dark.accent} />
+        <Text style={styles.collapsibleHeaderText}>{title}</Text>
+        <View style={styles.collapsibleCount}>
+          <Text style={styles.badgeText}>{count}</Text>
+        </View>
+        <Ionicons
+          name={expanded ? 'chevron-up' : 'chevron-down'}
+          size={18}
+          color={dark.textMuted}
+        />
+      </TouchableOpacity>
+      {expanded && <View style={styles.collapsibleBody}>{children}</View>}
+    </View>
   );
 }
 
@@ -347,22 +450,49 @@ interface SettingsTabProps {
   setCategory: (v: string) => void;
   displayImage: string | null;
   pickImage: () => void;
-  uniqueCode: string | null;
-  teamId: string | undefined;
-  linkCopied: boolean;
-  handleCopyInvite: () => void;
   saving: boolean;
   handleSave: () => void;
   deleting: boolean;
   handleDelete: () => void;
+  schedules: ScheduleEntry[];
+  setSchedules: (v: ScheduleEntry[]) => void;
+  addingSession: boolean;
+  setAddingSession: (v: boolean) => void;
+  newDay: number;
+  setNewDay: (v: number) => void;
+  newHour: string;
+  setNewHour: (v: string) => void;
+  newMinute: string;
+  setNewMinute: (v: string) => void;
 }
 
 function SettingsTab({
   name, setName, description, setDescription,
   category, setCategory, displayImage, pickImage,
-  uniqueCode, teamId, linkCopied, handleCopyInvite,
   saving, handleSave, deleting, handleDelete,
+  schedules, setSchedules, addingSession, setAddingSession,
+  newDay, setNewDay, newHour, setNewHour, newMinute, setNewMinute,
 }: SettingsTabProps) {
+  const sortedSchedules = [...schedules].sort((a, b) => a.day_of_week - b.day_of_week || a.start_time.localeCompare(b.start_time));
+
+  const handleAddSession = () => {
+    const h = parseInt(newHour, 10);
+    const m = parseInt(newMinute, 10);
+    if (isNaN(h) || h < 0 || h > 23) { Alert.alert('Invalid hour', 'Hour must be 0–23'); return; }
+    if (isNaN(m) || m < 0 || m > 59) { Alert.alert('Invalid minute', 'Minute must be 0–59'); return; }
+    const time = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    const duplicate = schedules.some((s) => s.day_of_week === newDay && s.start_time.slice(0, 5) === time);
+    if (duplicate) { Alert.alert('Duplicate', 'A session at this day and time already exists'); return; }
+    setSchedules([...schedules, { day_of_week: newDay, start_time: time }]);
+    setAddingSession(false);
+    setNewHour('08');
+    setNewMinute('00');
+  };
+
+  const handleDeleteSchedule = (index: number) => {
+    setSchedules(sortedSchedules.filter((_, i) => i !== index));
+  };
+
   return (
     <>
       <GlassCard>
@@ -399,20 +529,96 @@ function SettingsTab({
         </TouchableOpacity>
       </GlassCard>
 
-      {/* Invite link */}
-      <GlassCard style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>Invite Link</Text>
-        <Text style={styles.sectionHint}>Share this link with clients to join your team</Text>
-        <TouchableOpacity style={styles.inviteRow} activeOpacity={0.7} onPress={handleCopyInvite}>
-          <View style={styles.inviteLinkBox}>
-            <Ionicons name="link-outline" size={18} color={dark.textMuted} />
-            <Text style={styles.inviteLinkText} numberOfLines={1}>arifit://join/{uniqueCode ?? teamId}</Text>
+      {/* Training Schedule */}
+      <GlassCard style={styles.scheduleCard}>
+        <View style={styles.scheduleSectionHeader}>
+          <Ionicons name="calendar-outline" size={20} color={dark.accent} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.sectionTitle}>Training Schedule</Text>
+            <Text style={styles.sectionHint}>Set when sessions take place each week</Text>
           </View>
-          <View style={[styles.copyBtn, linkCopied && styles.copyBtnDone]}>
-            <Ionicons name={linkCopied ? 'checkmark' : 'copy-outline'} size={18} color={linkCopied ? dark.successGreen : dark.accent} />
-            <Text style={[styles.copyBtnText, linkCopied && styles.copyBtnTextDone]}>{linkCopied ? 'Copied' : 'Copy'}</Text>
+        </View>
+
+        {sortedSchedules.length > 0 ? (
+          <GlassCard padding={0} style={{ marginTop: theme.spacing.sm }}>
+            {sortedSchedules.map((s, i) => (
+              <View key={`${s.day_of_week}-${s.start_time}-${i}`}>
+                <View style={styles.scheduleRow}>
+                  <Text style={styles.scheduleDayText}>{DAY_NAMES[s.day_of_week]}</Text>
+                  <Text style={styles.scheduleTimeText}>{s.start_time.slice(0, 5)}</Text>
+                  <TouchableOpacity style={styles.scheduleDeleteBtn} onPress={() => handleDeleteSchedule(i)}>
+                    <Ionicons name="close" size={14} color={dark.error} />
+                  </TouchableOpacity>
+                </View>
+                {i < sortedSchedules.length - 1 && <View style={styles.memberDivider} />}
+              </View>
+            ))}
+          </GlassCard>
+        ) : (
+          <Text style={[styles.sectionHint, { marginTop: theme.spacing.sm }]}>No sessions scheduled</Text>
+        )}
+
+        {addingSession && (
+          <View style={styles.addSessionCard}>
+            <View style={[teamFormStyles.pillRow, { justifyContent: 'center' }]}>
+              {DAY_NAMES.map((d, i) => (
+                <TouchableOpacity
+                  key={d}
+                  style={[teamFormStyles.pill, newDay === i && teamFormStyles.pillActive]}
+                  onPress={() => setNewDay(i)}
+                >
+                  <Text style={[teamFormStyles.pillText, newDay === i && teamFormStyles.pillTextActive]}>{d}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={styles.timeInputRow}>
+              <View style={{ flex: 1 }}>
+                <GlassInput
+                  label="Hour"
+                  placeholder="08"
+                  value={newHour}
+                  onChangeText={(t) => setNewHour(t.replace(/[^0-9]/g, '').slice(0, 2))}
+                  keyboardType="number-pad"
+                  maxLength={2}
+                  style={styles.timeInput}
+                />
+              </View>
+              <Text style={styles.colonText}>:</Text>
+              <View style={{ flex: 1 }}>
+                <GlassInput
+                  label="Min"
+                  placeholder="00"
+                  value={newMinute}
+                  onChangeText={(t) => setNewMinute(t.replace(/[^0-9]/g, '').slice(0, 2))}
+                  keyboardType="number-pad"
+                  maxLength={2}
+                  style={styles.timeInput}
+                />
+              </View>
+            </View>
+
+            <View style={styles.actionBtnRow}>
+              <TouchableOpacity style={styles.cancelBtn} activeOpacity={0.7} onPress={() => setAddingSession(false)}>
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.addBtn} activeOpacity={0.8} onPress={handleAddSession}>
+                <Ionicons name="checkmark" size={18} color={dark.background} />
+                <Text style={styles.addBtnText}>Add</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </TouchableOpacity>
+        )}
+
+        {!addingSession && (
+          <TouchableOpacity
+            style={styles.addSessionBtn}
+            activeOpacity={0.8}
+            onPress={() => setAddingSession(true)}
+          >
+            <Text style={styles.addBtnText}>Add Session</Text>
+          </TouchableOpacity>
+        )}
       </GlassCard>
 
       {/* Save */}
@@ -453,7 +659,7 @@ function MembersTab({ members, loading, onRemove }: {
       <View style={styles.emptyState}>
         <Ionicons name="people-outline" size={40} color={dark.textMuted} />
         <Text style={styles.emptyTitle}>No members yet</Text>
-        <Text style={styles.emptyHint}>Share your invite link to get people to join</Text>
+        <Text style={styles.emptyHint}>Assign clients to this team from the Members tab</Text>
       </View>
     );
   }
@@ -508,7 +714,7 @@ function RequestsTab({ requests, loading, onAccept, onDecline }: {
       <View style={styles.emptyState}>
         <Ionicons name="person-add-outline" size={40} color={dark.textMuted} />
         <Text style={styles.emptyTitle}>No pending requests</Text>
-        <Text style={styles.emptyHint}>When someone uses your invite link, their request will appear here</Text>
+        <Text style={styles.emptyHint}>No pending requests at this time</Text>
       </View>
     );
   }
@@ -635,23 +841,102 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: theme.fontSize.md, fontWeight: '700', color: dark.text, marginBottom: 4 },
   sectionHint: { fontSize: theme.fontSize.sm, color: dark.textMuted, marginBottom: theme.spacing.md },
 
-  /* Invite */
-  inviteRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm },
-  inviteLinkBox: {
-    flex: 1, flexDirection: 'row', alignItems: 'center',
-    backgroundColor: dark.inputBackgroundGlass, borderWidth: 1, borderColor: dark.inputBorderGlass,
-    borderRadius: theme.borderRadius.lg, paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm + 2, gap: theme.spacing.sm,
+  /* Schedule */
+  scheduleCard: { marginTop: theme.spacing.lg },
+  scheduleSectionHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing.sm },
+  scheduleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: theme.spacing.md + 2,
+    paddingVertical: theme.spacing.md,
+    gap: theme.spacing.md,
   },
-  inviteLinkText: { flex: 1, fontSize: theme.fontSize.sm, color: dark.textSecondary },
-  copyBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: dark.accentBg, borderWidth: 1, borderColor: dark.glassButtonBorder,
-    borderRadius: theme.borderRadius.lg, paddingHorizontal: theme.spacing.md, paddingVertical: theme.spacing.sm + 2,
+  scheduleDayText: {
+    fontWeight: '700',
+    color: dark.accent,
+    fontSize: theme.fontSize.md,
+    width: 44,
   },
-  copyBtnDone: { backgroundColor: dark.successGreenBg, borderColor: dark.successBorder },
-  copyBtnText: { fontSize: theme.fontSize.sm, fontWeight: '600', color: dark.accent },
-  copyBtnTextDone: { color: dark.successGreen },
+  scheduleTimeText: {
+    flex: 1,
+    fontSize: theme.fontSize.md,
+    color: dark.textSecondary,
+  },
+  scheduleDeleteBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: dark.errorBg,
+    borderWidth: 1,
+    borderColor: dark.errorBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addSessionCard: {
+    backgroundColor: dark.whiteOverlay5,
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.md,
+    marginTop: theme.spacing.md,
+    gap: theme.spacing.md,
+  },
+  timeInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  timeInput: {
+    textAlign: 'center',
+  },
+  colonText: {
+    fontSize: theme.fontSize.xl,
+    fontWeight: '700',
+    color: dark.textSecondary,
+    marginTop: theme.spacing.xs,
+  },
+  actionBtnRow: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+  },
+  addBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: dark.accent,
+    borderRadius: theme.borderRadius.lg,
+    paddingVertical: theme.spacing.sm + 2,
+  },
+  addBtnText: {
+    fontSize: theme.fontSize.sm,
+    fontWeight: '700',
+    color: dark.background,
+  },
+  cancelBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: theme.spacing.sm + 2,
+    borderRadius: theme.borderRadius.lg,
+    backgroundColor: dark.whiteOverlay5,
+    borderWidth: 1,
+    borderColor: dark.whiteOverlay10,
+  },
+  cancelBtnText: {
+    fontSize: theme.fontSize.sm,
+    fontWeight: '600',
+    color: dark.textMuted,
+  },
+  addSessionBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    backgroundColor: dark.accent,
+    borderRadius: theme.borderRadius.lg,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.xl,
+    marginTop: theme.spacing.md,
+  },
 
   /* Save */
   saveButtonMargin: { marginTop: theme.spacing.lg },
@@ -667,6 +952,40 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.lg, paddingVertical: theme.spacing.sm + 4,
   },
   deleteButtonText: { fontSize: theme.fontSize.md, fontWeight: '600', color: dark.error },
+
+  /* Collapsible sections */
+  collapsibleWrapper: {
+    marginBottom: theme.spacing.md,
+  },
+  collapsibleHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+    backgroundColor: dark.whiteOverlay5,
+    borderWidth: 1,
+    borderColor: dark.whiteOverlay10,
+    borderRadius: theme.borderRadius.lg,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm + 4,
+  },
+  collapsibleHeaderText: {
+    flex: 1,
+    fontSize: theme.fontSize.md,
+    fontWeight: '700',
+    color: dark.text,
+  },
+  collapsibleCount: {
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  collapsibleBody: {
+    marginTop: theme.spacing.sm,
+  },
 
   /* Members / Requests rows */
   memberRow: {

@@ -35,39 +35,31 @@ export default function Welcome() {
       {/* Content */}
       <View style={styles.content}>
         <Text style={styles.headline}>
-          Elevate Your{'\n'}
-          <Text style={styles.headlineAccent}>Fitness</Text> Journey
+          Build Your{'\n'}
+          <Text style={styles.headlineAccent}>Coaching</Text> Business
         </Text>
 
         <Text style={styles.subtitle}>
-          Train smarter, track progress, and achieve your goals with personalized coaching.
+          Manage clients, create training plans, and grow your fitness business — all in one app.
         </Text>
 
         {/* Get Started — glass button with gold accent */}
         <TouchableOpacity
           style={styles.primaryButton}
           activeOpacity={0.8}
-          onPress={() => router.push('/sign-up?userType=client')}
+          onPress={() => router.push('/sign-up?userType=trainer')}
         >
           <Text style={styles.primaryButtonText}>Get Started</Text>
         </TouchableOpacity>
 
-        {/* I'm a Trainer — glass outlined button */}
+        {/* Login — outlined glass button */}
         <TouchableOpacity
-          style={styles.outlineButton}
+          style={styles.loginButton}
           activeOpacity={0.8}
-          onPress={() => router.push('/sign-up?userType=trainer')}
+          onPress={() => router.push('/sign-in')}
         >
-          <Text style={styles.outlineButtonText}>{"I'm a Trainer"}</Text>
+          <Text style={styles.loginButtonText}>Login</Text>
         </TouchableOpacity>
-
-        {/* Sign In link */}
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>Already have an account? </Text>
-          <TouchableOpacity onPress={() => router.push('/sign-in')}>
-            <Text style={styles.footerLink}>Sign In</Text>
-          </TouchableOpacity>
-        </View>
       </View>
     </View>
   );
@@ -133,31 +125,16 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.lg,
     fontWeight: '700',
   },
-  outlineButton: {
-    borderWidth: 1,
-    borderColor: dark.glassBorderStartStrong,
+  loginButton: {
     borderRadius: theme.borderRadius.lg,
     paddingVertical: theme.spacing.md,
     alignItems: 'center',
-    backgroundColor: dark.whiteOverlay5,
-    marginBottom: theme.spacing.lg,
+    borderWidth: 1,
+    borderColor: dark.glassBorderStartStrong,
   },
-  outlineButtonText: {
+  loginButtonText: {
     color: dark.text,
     fontSize: theme.fontSize.lg,
-    fontWeight: '600',
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-  },
-  footerText: {
-    fontSize: theme.fontSize.sm,
-    color: dark.textSecondary,
-  },
-  footerLink: {
-    fontSize: theme.fontSize.sm,
-    color: dark.accent,
-    fontWeight: '600',
+    fontWeight: '700',
   },
 });

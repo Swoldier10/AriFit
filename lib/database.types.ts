@@ -14,6 +14,38 @@ export type Database = {
   }
   public: {
     Tables: {
+      client_schedules: {
+        Row: {
+          id: string
+          trainer_client_id: string
+          day_of_week: number
+          start_time: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          trainer_client_id: string
+          day_of_week: number
+          start_time: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          trainer_client_id?: string
+          day_of_week?: number
+          start_time?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_schedules_trainer_client_id_fkey"
+            columns: ["trainer_client_id"]
+            isOneToOne: false
+            referencedRelation: "trainer_clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       assigned_workouts: {
         Row: {
           client_id: string
@@ -247,6 +279,38 @@ export type Database = {
         }
         Relationships: []
       }
+      team_schedules: {
+        Row: {
+          id: string
+          team_id: string
+          day_of_week: number
+          start_time: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          team_id: string
+          day_of_week: number
+          start_time: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          team_id?: string
+          day_of_week?: number
+          start_time?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_schedules_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       team_members: {
         Row: {
           id: string
@@ -338,6 +402,7 @@ export type Database = {
           client_id: string
           created_at: string
           id: string
+          plan_id: string | null
           status: string
           trainer_id: string
           updated_at: string
@@ -346,6 +411,7 @@ export type Database = {
           client_id: string
           created_at?: string
           id?: string
+          plan_id?: string | null
           status?: string
           trainer_id: string
           updated_at?: string
@@ -354,6 +420,7 @@ export type Database = {
           client_id?: string
           created_at?: string
           id?: string
+          plan_id?: string | null
           status?: string
           trainer_id?: string
           updated_at?: string
@@ -364,6 +431,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trainer_clients_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
             referencedColumns: ["id"]
           },
           {
@@ -526,6 +600,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_client_email: { Args: { client_user_id: string }; Returns: string }
       get_user_type: { Args: never; Returns: string }
       is_member_of_team: { Args: { _team_id: string }; Returns: boolean }
     }
